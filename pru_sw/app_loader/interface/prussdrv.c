@@ -62,6 +62,7 @@
 #define HEXA_DECIMAL_BASE 16
 
 static tprussdrv prussdrv;
+static char initialized;
 
 int __prussdrv_memmap_init(void)
 {
@@ -251,6 +252,7 @@ int prussdrv_init(void)
       prussdrv.fd[i] = -1;
     }
     prussdrv.mmap_fd = -1;
+    initialized = 1;
 
     return 0;
 
@@ -259,6 +261,9 @@ int prussdrv_init(void)
 int prussdrv_open(unsigned int host_interrupt)
 {
     char name[PRUSS_UIO_PRAM_PATH_LEN];
+
+    if (!initialized)
+        return -1;
 
     if (host_interrupt >= 0 && host_interrupt < NUM_PRU_HOSTIRQS &&
         prussdrv.fd[host_interrupt] < 0) {
