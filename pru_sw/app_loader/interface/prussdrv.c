@@ -68,9 +68,9 @@ int __prussdrv_memmap_init(void)
     int i, fd;
     char hexstring[PRUSS_UIO_PARAM_VAL_LEN];
 
-    if (prussdrv.mmap_fd == 0) {
+    if (prussdrv.mmap_fd < 0) {
         for (i = 0; i < NUM_PRU_HOSTIRQS; i++) {
-            if (prussdrv.fd[i])
+            if (prussdrv.fd[i] >= 0)
                 break;
         }
         if (i == NUM_PRU_HOSTIRQS)
@@ -244,7 +244,14 @@ int __prussdrv_memmap_init(void)
 
 int prussdrv_init(void)
 {
+    int i;
+
     memset(&prussdrv, 0, sizeof(prussdrv));
+    for (i = 0; i < NUM_PRU_HOSTIRQS; ++i) {
+      prussdrv.fd[i] = -1;
+    }
+    prussdrv.mmap_fd = -1;
+
     return 0;
 
 }
@@ -252,13 +259,16 @@ int prussdrv_init(void)
 int prussdrv_open(unsigned int host_interrupt)
 {
     char name[PRUSS_UIO_PRAM_PATH_LEN];
-    if (!prussdrv.fd[host_interrupt]) {
+
+    if (host_interrupt >= 0 && host_interrupt < NUM_PRU_HOSTIRQS &&
+        prussdrv.fd[host_interrupt] < 0) {
         sprintf(name, "/dev/uio%d", host_interrupt);
         prussdrv.fd[host_interrupt] = open(name, O_RDWR | O_SYNC);
+        if (prussdrv.fd[host_interrupt] < 0)
+            return -1;
         return __prussdrv_memmap_init();
     } else {
         return -1;
-
     }
 }
 
@@ -483,14 +493,20 @@ int prussdrv_pru_send_event(unsigned int eventnum)
 
 unsigned int prussdrv_pru_wait_event(unsigned int host_interrupt)
 {
+    int fd;
     unsigned int event_count;
-    read(prussdrv.fd[host_interrupt], &event_count, sizeof(int));
+
+    fd = prussdrv_pru_event_fd(host_interrupt);
+    if (fd < 0)
+        return 0;
+
+    read(fd, &event_count, sizeof(int));
     return event_count;
 }
 
 int prussdrv_pru_event_fd(unsigned int host_interrupt)
 {
-    if (host_interrupt < NUM_PRU_HOSTIRQS)
+    if (host_interrupt >= 0 && host_interrupt < NUM_PRU_HOSTIRQS)
         return prussdrv.fd[host_interrupt];
     else
         return -1;
@@ -658,9 +674,14 @@ int prussdrv_exit()
     munmap(prussdrv.l3ram_base, prussdrv.l3ram_map_size);
     munmap(prussdrv.extram_base, prussdrv.extram_map_size);
     for (i = 0; i < NUM_PRU_HOSTIRQS; i++) {
-        if (prussdrv.fd[i])
+        if (prussdrv.fd[i]>=0)
             close(prussdrv.fd[i]);
     }
+    if (prussdrv.mmap_fd>=0)
+        close(prussdrv.mmap_fd);
+
+    prussdrv_init();  // clear all addresses and fds.
+
     return 0;
 }
 
