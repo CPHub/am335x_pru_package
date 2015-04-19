@@ -417,8 +417,10 @@ int prussdrv_pruintc_init(const tpruss_intc_initdata *prussintc_init_data)
             return -1;
         }
     }
+    pruintc_io[PRU_INTC_ECR1_REG >> 2] = 0xFFFFFFFF;
     pruintc_io[PRU_INTC_ESR1_REG >> 2] = mask1;
     pruintc_io[PRU_INTC_SECR1_REG >> 2] = mask1;
+    pruintc_io[PRU_INTC_ECR2_REG >> 2] = 0xFFFFFFFF;
     pruintc_io[PRU_INTC_ESR2_REG >> 2] = mask2;
     pruintc_io[PRU_INTC_SECR2_REG >> 2] = mask2;
 
